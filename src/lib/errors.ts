@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import { Prisma } from "@prisma/client";
 
 /** API 오류 코드 (TRD §5: 401 / 403 / 404 / 409 / 422 / 429) */
 export class ApiError extends Error {
@@ -37,10 +38,21 @@ export function route<Ctx>(handler: Handler<Ctx>): Handler<Ctx> {
         return NextResponse.json({ error: { code: "INVALID", message } }, { status: 422 });
       }
       console.error(e);
-      return NextResponse.json(
-        { error: { code: "INTERNAL", message: "일시적인 오류가 발생했습니다." } },
-        { status: 500 },
-      );
+      // DB 연결·초기화 실패는 원인을 알 수 있게 503 으로 구분한다 (DATABASE_URL 미설정, 마이그레이션 미적용 등)
+      if (e instanceof Prisma.PrismaClientInitializationError) {
+        return NextResponse.json(
+          { error: { code: "DB_UNAVAILABLE", message: "데이터베이스에 연결할 수 없습니다. DATABASE_URL 설정을 확인해 주세요." } },
+          { status: 503 },
+        );
+      }
+      if (e instanceof Prisma.PrismaClientKnownRequestError && (e.code === "P2021" || e.code === "P2022")) {
+        return NextResponse.json(
+          { error: { code: "DB_NOT_MIGRATED", message: "데이터베이스 스키마가 적용되지 않았습니다. `prisma migrate deploy`를 실행해 주세요." } },
+          { status: 503 },
+        );
+      }
+      const message = process.env.NODE_ENV === "production" ? "일시적인 오류가 발생했습니다." : (e as Error).message;
+      return NextResponse.json({ error: { code: "INTERNAL", message } }, { status: 500 });
     }
   };
 }

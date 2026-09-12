@@ -45,6 +45,12 @@ src/app/g/[token]/**        홈 · 서재 · 지난 책 상세 · 멤버 · 투�
 - **다음 회차** = 그 다음 순번. "다음 책 투표"가 여기에 붙고, 마감·확정되는 순간 현재 회차가 됩니다(별도 "월 넘기기" 없음).
 - 아직 책이 한 번도 확정되지 않은 신규 모임에서는 1회차가 일정·장소의 그릇이 됩니다.
 
+## Vercel 배포
+
+1. Vercel 프로젝트 **Environment Variables**에 `DATABASE_URL`(Supabase / Neon 등 Postgres 연결 문자열)을 넣습니다. 표지를 S3 호환 스토리지에 두려면 `COVER_STORAGE_DRIVER=s3`와 `S3_*` 값도 함께 넣습니다(서버리스에서는 `local` 드라이버가 재배포 시 파일을 잃습니다).
+2. 빌드 스크립트가 `prisma generate && prisma migrate deploy && next build`이므로, 배포마다 Prisma Client 재생성과 마이그레이션 적용이 자동으로 됩니다. Vercel은 `node_modules`를 캐시하기 때문에 `prisma generate`가 빌드에 없으면 API가 500으로 실패합니다.
+3. `DATABASE_URL`이 없으면 빌드 단계에서 `prisma migrate deploy`가 실패하며 원인이 로그에 바로 드러납니다. 런타임에 DB에 닿지 못하면 API는 503 `DB_UNAVAILABLE`, 마이그레이션이 없으면 503 `DB_NOT_MIGRATED`를 돌려줍니다.
+
 ## 환경 변수
 
 `.env.example` 참고. 표지 저장소는 `COVER_STORAGE_DRIVER=local`(기본, `./data/covers`에 저장 후 `/api/covers/…`로 서빙) 또는 `s3`.
