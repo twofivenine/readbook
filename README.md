@@ -48,8 +48,15 @@ src/app/g/[token]/**        홈 · 서재 · 지난 책 상세 · 멤버 · 투�
 ## Vercel 배포
 
 1. Vercel 프로젝트 **Environment Variables**에 `DATABASE_URL`(Supabase / Neon 등 Postgres 연결 문자열)을 넣습니다. 표지를 S3 호환 스토리지에 두려면 `COVER_STORAGE_DRIVER=s3`와 `S3_*` 값도 함께 넣습니다(서버리스에서는 `local` 드라이버가 재배포 시 파일을 잃습니다).
-2. 빌드 스크립트가 `prisma generate && prisma migrate deploy && next build`이므로, 배포마다 Prisma Client 재생성과 마이그레이션 적용이 자동으로 됩니다. Vercel은 `node_modules`를 캐시하기 때문에 `prisma generate`가 빌드에 없으면 API가 500으로 실패합니다.
-3. `DATABASE_URL`이 없으면 빌드 단계에서 `prisma migrate deploy`가 실패하며 원인이 로그에 바로 드러납니다. 런타임에 DB에 닿지 못하면 API는 503 `DB_UNAVAILABLE`, 마이그레이션이 없으면 503 `DB_NOT_MIGRATED`를 돌려줍니다.
+2. 빌드 스크립트는 `prisma generate && next build`입니다. Vercel은 `node_modules`를 캐시하므로 `prisma generate`가 빌드에 없으면 API가 500으로 실패합니다.
+3. 마이그레이션은 빌드와 분리해 **한 번** 적용합니다. 로컬에서 `.env`의 `DATABASE_URL`을 운영 DB로 두고 다음을 실행하세요.
+
+   ```bash
+   npm run db:migrate    # = prisma migrate deploy
+   ```
+
+   Supabase는 마이그레이션에 **직접 연결 URL**(포트 5432, "Direct connection")을 써야 합니다. 트랜잭션 풀러 URL(포트 6543)로는 마이그레이션이 실패합니다. 앱 런타임의 `DATABASE_URL`은 풀러 URL이어도 됩니다.
+4. 스키마가 적용되지 않은 채 접속하면 API가 503 `DB_NOT_MIGRATED`를, DB에 닿지 못하면 503 `DB_UNAVAILABLE`을 돌려주므로 원인을 바로 알 수 있습니다.
 
 ## 환경 변수
 
