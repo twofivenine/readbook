@@ -45,13 +45,11 @@ src/app/                  / 홈 · /polls/{book|place} 투표 상세 · /polls/b
 
 1. Environment Variables에 `DATABASE_URL`(Supabase / Neon 등 Postgres)을 넣습니다. 표지 저장은 `COVER_STORAGE_DRIVER=s3` + `S3_*` 값을 함께 넣습니다(서버리스에서는 `local` 드라이버가 재배포 시 파일을 잃습니다).
 2. 빌드는 `prisma generate && next build`. Vercel이 `node_modules`를 캐시하므로 이 단계가 없으면 API가 500으로 실패합니다.
-3. 마이그레이션은 빌드와 분리해 로컬에서 운영 DB로 한 번 적용합니다. Supabase는 **직접 연결 URL(포트 5432)** 을 써야 합니다.
+3. 테이블은 한 번만 만들면 됩니다. 두 가지 방법 중 하나를 고르세요.
+   - **Supabase SQL Editor**(로컬 환경 불필요): `prisma/supabase_setup.sql` 내용을 붙여 넣고 Run. 마이그레이션 이력까지 기록하므로 이후 `npm run db:migrate`와도 호환됩니다.
+   - **로컬에서**: `.env`의 `DATABASE_URL`을 Supabase **직접 연결 URL(포트 5432)** 로 두고 `npm run db:migrate`.
 
-   ```bash
-   npm run db:migrate
-   ```
-
-   v1.0 스키마가 이미 적용된 DB라면 이 마이그레이션이 기존 테이블을 모두 정리하고 새로 만듭니다(보존할 데이터 없음 전제).
+   v1.0 스키마가 이미 적용된 DB라면 기존 테이블을 모두 정리하고 새로 만듭니다(보존할 데이터 없음 전제).
 4. DB에 못 닿으면 API가 503 `DB_UNAVAILABLE`, 스키마 미적용이면 503 `DB_NOT_MIGRATED`를 돌려줍니다.
 
 ## 환경 변수
