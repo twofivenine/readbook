@@ -33,8 +33,11 @@ export function route<Ctx>(handler: Handler<Ctx>): Handler<Ctx> {
       }
       console.error(e);
       if (e instanceof Prisma.PrismaClientInitializationError) {
+        // 원인 파악용: Prisma 오류 코드(P1000 인증 실패, P1001 서버 도달 불가, P1012 URL 비어 있음 등)와 첫 줄
+        const lines = e.message.split("\n").map((l) => l.trim()).filter(Boolean);
+        const detail = lines.find((l) => /P\d{4}|reach|Authentication|denied|empty|timed out|refused/i.test(l)) ?? lines[lines.length - 1] ?? "";
         return NextResponse.json(
-          { error: { code: "DB_UNAVAILABLE", message: "데이터베이스에 연결할 수 없습니다. DATABASE_URL 설정을 확인해 주세요." } },
+          { error: { code: "DB_UNAVAILABLE", message: `데이터베이스에 연결할 수 없습니다. DATABASE_URL 설정을 확인해 주세요. (${detail})` } },
           { status: 503 },
         );
       }
