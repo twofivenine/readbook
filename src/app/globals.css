@@ -1,60 +1,83 @@
 @import "tailwindcss";
 
-/* 책읽는 밤 — 라이트 테마 단일 (N-2). 와이어프레임 v2 색·간격 토큰 */
+/* 책읽는 밤 — 시안 토큰 (라이트 단일, N-2) */
 :root {
-  --bg: #f4f2ed;
+  --bg: #efece5;
   --card: #ffffff;
-  --ink: #1a1a1a;
-  --ink-2: #4a463e;
-  --muted: #6b665d;
-  --mono: #7a756b;
-  --line: #cfcac0;
-  --line-soft: rgba(0, 0, 0, 0.1);
-  --accent: #2a78d6;
-  --accent-soft: #eaf2fc;
-  --danger: #c0392b;
-  --star: #e0a400;
+  --card-soft: #faf8f4;
+  --ink: #1c1d1a;
+  --ink-2: #4a4840;
+  --muted: #6f6d66;
+  --mono: #8a877e;
+  --line: #e0ddd4;
+  --line-soft: #eae7df;
+  --accent: #2f6b4f;
+  --accent-deep: #24543e;
+  --accent-soft: #f4f7f4;
+  --accent-line: #c3d5c8;
+  --dark: #1c1d1a;
+  --dark-2: #2a2b28;
+  --dark-line: #4a4b47;
+  --dark-text: #f5f3ee;
+  --dark-muted: #c9c5bb;
+  --dark-label: #a8b5a9;
+  --danger: #b4463a;
+  --star: #c9962b;
+  --bar: #b9b4a9;
 }
 
 @theme inline {
   --color-bg: var(--bg);
   --color-card: var(--card);
+  --color-card-soft: var(--card-soft);
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
   --color-muted: var(--muted);
   --color-mono: var(--mono);
   --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
   --color-accent: var(--accent);
+  --color-accent-deep: var(--accent-deep);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-line: var(--accent-line);
+  --color-dark: var(--dark);
+  --color-dark-2: var(--dark-2);
+  --color-dark-line: var(--dark-line);
+  --color-dark-text: var(--dark-text);
+  --color-dark-muted: var(--dark-muted);
+  --color-dark-label: var(--dark-label);
   --color-danger: var(--danger);
   --color-star: var(--star);
-  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --color-bar: var(--bar);
+  --font-sans: var(--font-body), "IBM Plex Sans KR", -apple-system, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --font-display: var(--font-display), "Gothic A1", var(--font-body), system-ui, sans-serif;
   --font-mono: ui-monospace, Menlo, Consolas, monospace;
 }
 
 @layer base {
   html { color-scheme: light only; }
-
   body {
     background: var(--bg);
     color: var(--ink);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
-
   button, input, textarea, select { font: inherit; color: inherit; }
-
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
   input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
 }
 
 @layer components {
-  /* 와이어프레임의 모노 라벨 */
+  /* 시안의 모노 라벨: 11px, 자간 넓게 */
   .label-mono {
     font-family: var(--font-mono);
     font-size: 11px;
-    letter-spacing: 0.02em;
+    font-weight: 500;
+    letter-spacing: 0.12em;
     color: var(--mono);
   }
+  .display { font-family: var(--font-display); letter-spacing: -0.02em; }
+  /* 표지 플레이스홀더 빗금 */
+  .cover-placeholder { background: repeating-linear-gradient(135deg, #f0ede6 0 9px, #e7e3da 9px 18px); }
+  .cover-placeholder-dark { background: repeating-linear-gradient(45deg, #2a2b28 0 10px, #313230 10px 20px); }
 }

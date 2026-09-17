@@ -1,12 +1,18 @@
 "use client";
-/** 이달의 책 (F-5, F-9.5): 표지·제목·지은이·쪽수, 내 별점(이름), 별점 목록 */
+/** 이달의 책 — 시안: 표지 + 제목 + 별점 행 + (한줄평은 같은 카드 하단 섹션) */
 import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { useWrite } from "@/lib/hooks";
 import { rememberName, useClientStore } from "@/lib/clientStore";
 import type { BookView, RatingsSummary, RoundView } from "@/lib/types";
-import { Button, Card, Cover, Divider, ErrorText, Input, Label, NameInput, StarPicker } from "@/components/ui";
+import { Button, Card, Cover, Divider, ErrorText, Input, Label, NameInput, StarPicker, Title } from "@/components/ui";
+import { ReviewsSection } from "./Reviews";
+
+function monthWord(label: string | null) {
+  const m = label ? Number(label.split("-")[1]) : NaN;
+  return Number.isFinite(m) ? `${m}월의 책` : "이달의 책";
+}
 
 export function BookOfMonth({ round }: { round: RoundView | null }) {
   const book = round?.book ?? null;
@@ -14,30 +20,53 @@ export function BookOfMonth({ round }: { round: RoundView | null }) {
   if (!book) {
     return (
       <Card>
-        <Label>이달의 책</Label>
-        <div className="text-[18px] font-bold text-muted">아직 확정된 책이 없어요</div>
-        <div className="text-[14px] text-muted">다음 책 투표를 마감하면 이달의 책이 정해져요.</div>
-        <Link href="/polls/book" className="text-[15px] text-accent">다음 책 투표로 →</Link>
+        <Title>이달의 책</Title>
+        <div className="text-[15px] text-muted">아직 확정된 책이 없어요. 다음 책 투표를 마감하면 여기에 표시돼요.</div>
+        <Link href="/polls/book" className="text-[14px] text-accent">다음 책 투표로 →</Link>
       </Card>
     );
   }
+  const r = round!.ratings;
   return (
-    <Card id="book-of-month">
+    <Card id="book-of-month" className="gap-5">
+      <div className="flex justify-between items-baseline gap-3">
+        <Title>{monthWord(round!.label)}</Title>
+        <span className="text-[13px] text-mono">{r.count}명 별점 · 평균 {r.avg === null ? "–" : r.avg.toFixed(1)}</span>
+      </div>
       {editing ? (
         <BookEditForm book={book} onDone={() => setEditing(false)} />
       ) : (
-        <div className="flex gap-3">
-          <Cover url={book.coverUrl} title={book.title} className="w-[72px]" />
-          <div className="flex flex-col gap-1 min-w-0 flex-1">
-            <Label>{round?.label ? `${round.label} 이달의 책` : "이달의 책"}</Label>
-            <div className="text-[18px] font-bold leading-tight">{book.title}</div>
-            <div className="text-[14px] text-muted">{book.author} · {book.totalPages}쪽</div>
-            <button type="button" className="self-start text-[12px] text-muted hover:text-ink mt-1" onClick={() => setEditing(true)}>책 정보 수정</button>
+        <div className="flex gap-4 md:gap-5">
+          <Cover url={book.coverUrl} title={book.title} className="w-[84px] md:w-[104px]" />
+          <div className="flex-1 min-w-0 flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <div className="display font-medium text-[17px] md:text-[19px] leading-snug">{book.title}</div>
+              <div className="text-[13px] text-mono">{book.author} · {book.totalPages}쪽</div>
+            </div>
+            <RatingSection bookId={book.id} ratings={r} />
+            <button type="button" className="self-start text-[12px] text-mono hover:text-ink" onClick={() => setEditing(true)}>책 정보 수정</button>
           </div>
         </div>
       )}
+      {r.list.length > 0 && (
+        <>
+          <Divider />
+          <div className="flex flex-col gap-2.5">
+            <Label>별점</Label>
+            <ul className="flex flex-col gap-2">
+              {r.list.map((x, i) => (
+                <li key={i} className="flex items-center gap-3 text-[14px]">
+                  <span className={x.mine ? "w-[52px] font-medium" : "w-[52px]"}>{x.mine ? "나" : x.name}</span>
+                  <span className="flex-1 h-1.5 rounded-full bg-line-soft overflow-hidden"><span className="block h-full rounded-full bg-accent" style={{ width: `${x.score * 20}%` }} /></span>
+                  <span className="w-[52px] text-right text-[13px] text-ink-2">★ {x.score}.0</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
+      )}
       <Divider />
-      <RatingSection bookId={book.id} ratings={round!.ratings} />
+      <ReviewsSection bookId={book.id} reviews={round!.reviews} />
     </Card>
   );
 }
@@ -53,26 +82,13 @@ export function RatingSection({ bookId, ratings }: { bookId: string; ratings: Ra
   const remove = useWrite(() => api(`/books/${bookId}/rating`, { method: "DELETE" }));
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex justify-between items-baseline">
-        <Label>내 별점 (이름을 적고 별을 누르세요)</Label>
-        <span className="text-[13px] text-muted">평균 {ratings.avg === null ? "–" : <span className="text-star font-semibold">★{ratings.avg}</span>} · {ratings.count}명</span>
-      </div>
-      <NameInput value={name} onChange={setName} />
-      <div className="flex items-center gap-3 flex-wrap">
+      <Label>내 별점 · 이름을 적고 별을 누르세요</Label>
+      <div className="flex flex-wrap items-center gap-3">
+        <NameInput value={name} onChange={setName} className="max-w-[180px]" />
         <StarPicker value={ratings.mine} onChange={(s) => rate.mutate(s)} disabled={rate.isPending || remove.isPending} />
-        <span className="text-[12px] text-muted">1~5점</span>
-        {ratings.mine !== null && (
-          <button type="button" className="text-[12px] text-muted hover:text-danger" onClick={() => remove.mutate(undefined)}>내 별점 삭제</button>
-        )}
+        {ratings.mine !== null && <button type="button" className="text-[12px] text-mono hover:text-danger" onClick={() => remove.mutate(undefined)}>내 별점 삭제</button>}
       </div>
       <ErrorText>{rate.error?.message ?? remove.error?.message}</ErrorText>
-      {ratings.list.length > 0 && (
-        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[14px]">
-          {ratings.list.map((r, i) => (
-            <li key={i} className={r.mine ? "font-semibold" : ""}>{r.name} <span className="text-star">★{r.score}</span></li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }
@@ -84,7 +100,7 @@ function BookEditForm({ book, onDone }: { book: BookView; onDone: () => void }) 
   const save = useWrite(() => api(`/books/${book.id}`, { method: "PATCH", json: { title, author, totalPages: Number(pages) } }));
   return (
     <form className="flex flex-col gap-2" onSubmit={(e) => { e.preventDefault(); save.mutate(undefined, { onSuccess: onDone }); }}>
-      <Label>책 정보 수정 (누구나)</Label>
+      <Label>책 정보 수정 · 누구나</Label>
       <Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} placeholder="제목" required aria-label="제목" />
       <Input value={author} onChange={(e) => setAuthor(e.target.value)} maxLength={50} placeholder="지은이" required aria-label="지은이" />
       <Input type="number" inputMode="numeric" min={1} max={9999} value={pages} onChange={(e) => setPages(e.target.value)} placeholder="총 쪽수" required aria-label="총 쪽수" />
