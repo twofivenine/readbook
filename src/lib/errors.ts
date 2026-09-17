@@ -47,8 +47,8 @@ export function route<Ctx>(handler: Handler<Ctx>): Handler<Ctx> {
           { status: 503 },
         );
       }
-      const message = process.env.NODE_ENV === "production" ? "일시적인 오류가 발생했습니다." : (e as Error).message;
-      return NextResponse.json({ error: { code: "INTERNAL", message } }, { status: 500 });
+      const first = ((e as Error).message ?? "").split("\n").map((l) => l.trim()).filter(Boolean).slice(-1)[0] ?? "";
+      return NextResponse.json({ error: { code: "INTERNAL", message: `일시적인 오류가 발생했습니다.${first ? ` (${first.slice(0, 200)})` : ""}` } }, { status: 500 });
     }
   };
 }

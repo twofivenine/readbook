@@ -1,7 +1,10 @@
-/** TRD v1.1 §8 표지 저장소: s3 (S3 호환) 또는 local (개발용, ./data → /api/covers/{key}) */
-import { promises as fs } from "node:fs";
-import path from "node:path";
+/**
+ * TRD v1.1 §8 표지 저장소.
+ * - db (기본): 리사이즈된 WebP(수십 KB)를 Postgres `cover_files`에 저장. 추가 설정 없이 Vercel에서 동작.
+ * - s3: COVER_STORAGE_DRIVER=s3 + S3_* 환경 변수로 S3 호환 오브젝트 스토리지 사용.
+ */
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { prisma } from "./prisma";
 
 export interface CoverStorage {
   put(key: string, body: Buffer, contentType: string): Promise<void>;
@@ -9,26 +12,20 @@ export interface CoverStorage {
   publicUrl(key: string): string;
 }
 
-const LOCAL_ROOT = path.join(process.cwd(), "data");
-
-class LocalStorage implements CoverStorage {
-  async put(key: string, body: Buffer) {
-    const file = path.join(LOCAL_ROOT, key);
-    await fs.mkdir(path.dirname(file), { recursive: true });
-    await fs.writeFile(file, body);
+class DbStorage implements CoverStorage {
+  async put(key: string, body: Buffer, contentType: string) {
+    const data = new Uint8Array(body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as ArrayBuffer);
+    await prisma.coverFile.upsert({ where: { key }, create: { key, data, contentType }, update: { data, contentType } });
   }
   async remove(key: string) {
-    await fs.rm(path.join(LOCAL_ROOT, key), { force: true });
+    await prisma.coverFile.deleteMany({ where: { key } });
   }
   publicUrl(key: string) {
     return `/api/covers/${key}`;
   }
-  async read(key: string): Promise<Buffer | null> {
-    try {
-      return await fs.readFile(path.join(LOCAL_ROOT, key));
-    } catch {
-      return null;
-    }
+  async read(key: string) {
+    const f = await prisma.coverFile.findUnique({ where: { key } });
+    return f ? { data: Buffer.from(f.data), contentType: f.contentType } : null;
   }
 }
 
@@ -52,6 +49,6 @@ class S3Storage implements CoverStorage {
   }
 }
 
-export const localStorageDriver = new LocalStorage();
-export const coverStorage = (): CoverStorage => (process.env.COVER_STORAGE_DRIVER === "s3" ? new S3Storage() : localStorageDriver);
+export const dbStorage = new DbStorage();
+export const coverStorage = (): CoverStorage => (process.env.COVER_STORAGE_DRIVER === "s3" ? new S3Storage() : dbStorage);
 export const coverUrl = (key: string | null | undefined): string | null => (key ? coverStorage().publicUrl(key) : null);

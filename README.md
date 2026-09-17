@@ -11,7 +11,7 @@
 
 ## 기술 스택
 
-Next.js (App Router) + TypeScript + TanStack Query · PostgreSQL + Prisma · Tailwind CSS · 표지는 sharp로 600×900 WebP 변환 후 S3 호환 스토리지 또는 로컬 파일(개발용).
+Next.js (App Router) + TypeScript + TanStack Query · PostgreSQL + Prisma · Tailwind CSS · 표지는 sharp로 600×900 WebP 변환 후 기본적으로 DB(`cover_files`)에 저장. `COVER_STORAGE_DRIVER=s3`로 S3 호환 스토리지도 가능.
 
 ## 시작하기
 
@@ -43,10 +43,10 @@ src/app/                  / 홈 · /polls/{book|place} 투표 상세 · /polls/b
 
 ## Vercel 배포
 
-1. Environment Variables에 `DATABASE_URL`(Supabase / Neon 등 Postgres)을 넣습니다. 표지 저장은 `COVER_STORAGE_DRIVER=s3` + `S3_*` 값을 함께 넣습니다(서버리스에서는 `local` 드라이버가 재배포 시 파일을 잃습니다).
+1. Settings → Environments → Production에 `DATABASE_URL`을 넣습니다. Supabase는 **Transaction pooler** 주소(`postgres.<ref>@…pooler.supabase.com:6543/postgres?pgbouncer=true`)를 써야 합니다. 직접 연결 주소(`db.<ref>.supabase.co:5432`)는 IPv6 전용이라 Vercel에서 닿지 않습니다. 표지는 기본으로 DB에 저장되므로 추가 설정이 없습니다.
 2. 빌드는 `prisma generate && next build`. Vercel이 `node_modules`를 캐시하므로 이 단계가 없으면 API가 500으로 실패합니다.
 3. 테이블은 한 번만 만들면 됩니다. 두 가지 방법 중 하나를 고르세요.
-   - **Supabase SQL Editor**(로컬 환경 불필요): `prisma/supabase_setup.sql` 내용을 붙여 넣고 Run. 마이그레이션 이력까지 기록하므로 이후 `npm run db:migrate`와도 호환됩니다.
+   - **Supabase SQL Editor**(로컬 환경 불필요): `prisma/supabase_setup.sql`을 붙여 넣고 Run. 이미 실행했다면 이후 추가된 `prisma/supabase_update_*.sql`만 순서대로 실행합니다. 마이그레이션 이력까지 기록하므로 `npm run db:migrate`와도 호환됩니다.
    - **로컬에서**: `.env`의 `DATABASE_URL`을 Supabase **직접 연결 URL(포트 5432)** 로 두고 `npm run db:migrate`.
 
    v1.0 스키마가 이미 적용된 DB라면 기존 테이블을 모두 정리하고 새로 만듭니다(보존할 데이터 없음 전제).
