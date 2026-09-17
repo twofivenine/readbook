@@ -1,99 +1,66 @@
-/** TRD §5.6 홈 통합 응답 + §6.4 지금 할 일 */
+/** TRD v1.1 §5.1 홈 통합 응답 + §6.3 지금 할 일 */
 import { prisma } from "@/lib/prisma";
-import type { Group, Member } from "@prisma/client";
-import type { HomeView, Todo, PollView } from "@/lib/types";
+import type { HomeView, PollView, RoundView, Todo } from "@/lib/types";
 import { kstDayDiff } from "@/lib/time";
-import { getCurrentRound } from "./rounds";
+import { findHomeRound } from "./rounds";
 import { findPoll } from "./polls";
-import { bookView, memberRef, placeView, pollInclude, pollView, progressViews, ratingsSummary, reviewInclude, reviewView } from "./views";
+import { bookView, placeView, pollInclude, pollView, ratingsSummary, reviewView } from "./views";
 
-export async function buildHome(group: Group, me: Member | null): Promise<HomeView> {
-  const members = await prisma.member.findMany({ where: { groupId: group.id }, orderBy: { createdAt: "asc" } });
-  const current = await getCurrentRound(group.id);
-  // 홈 회차: 현재 회차, 없으면 seq 1 (신규 모임의 일정·장소 그릇)
-  const homeRoundRow = current ?? (await prisma.round.findFirst({ where: { groupId: group.id }, orderBy: { seq: "asc" } }));
-  const nextSeq = (current?.seq ?? 0) + 1;
-  const nextRoundRow = await prisma.round.findUnique({ where: { groupId_seq: { groupId: group.id, seq: nextSeq } } });
-
+export async function buildHome(clientId: string | null): Promise<HomeView> {
+  const homeRow = await findHomeRound();
   const [homeRound, bookPollRow] = await Promise.all([
-    homeRoundRow
+    homeRow
       ? prisma.round.findUnique({
-          where: { id: homeRoundRow.id },
-          include: {
-            book: true,
-            place: true,
-            attendances: { include: { member: true } },
-            polls: { where: { kind: "place" }, include: pollInclude },
-          },
+          where: { id: homeRow.id },
+          include: { book: true, place: true, attendances: { orderBy: { createdAt: "asc" } }, polls: { where: { kind: "place" }, include: pollInclude } },
         })
       : null,
-    findPoll(group.id, "book"),
+    findPoll("book"),
   ]);
 
-  const memberId = me?.id ?? null;
-  let currentRound: HomeView["currentRound"] = null;
-
+  let currentRound: RoundView | null = null;
   if (homeRound) {
     const book = homeRound.book;
-    const [progresses, ratings, reviews] = book
+    const [ratings, reviews] = book
       ? await Promise.all([
-          prisma.progress.findMany({ where: { bookId: book.id } }),
-          prisma.rating.findMany({ where: { bookId: book.id } }),
-          prisma.review.findMany({ where: { bookId: book.id }, orderBy: { createdAt: "desc" }, include: reviewInclude }),
+          prisma.rating.findMany({ where: { bookId: book.id }, orderBy: { createdAt: "asc" } }),
+          prisma.review.findMany({ where: { bookId: book.id }, orderBy: { createdAt: "desc" } }),
         ])
-      : [[], [], []];
-    const placePollRow = homeRound.polls[0] ?? null;
-    const pv = book ? progressViews(members, progresses, ratings, book.totalPages) : [];
+      : [[], []];
+    const placePoll = homeRound.polls[0] ?? null;
     currentRound = {
       id: homeRound.id,
-      label: homeRound.label,
       seq: homeRound.seq,
+      label: homeRound.label,
       book: book ? bookView(book) : null,
       meetingAt: homeRound.meetingAt?.toISOString() ?? null,
       place: homeRound.place ? placeView(homeRound.place) : null,
-      attendances: homeRound.attendances.map((a) => ({ memberId: a.memberId, nickname: a.member.nickname, status: a.status })),
-      placePoll: placePollRow ? pollView(placePollRow, memberId) : null,
-      progresses: pv,
-      completedCount: pv.filter((p) => p.completed).length,
-      ratings: ratingsSummary(ratings, memberId),
-      reviews: reviews.map(reviewView),
+      attendances: homeRound.attendances.map((a) => ({ name: a.name, status: a.status, mine: !!clientId && a.clientId === clientId })),
+      placePoll: placePoll ? pollView(placePoll, clientId) : null,
+      ratings: ratingsSummary(ratings, clientId),
+      reviews: reviews.map((r) => reviewView(r, clientId)),
     };
   }
-
-  const bookPoll: PollView | null = bookPollRow ? pollView(bookPollRow, memberId) : null;
-  const nextRound = { id: nextRoundRow?.id ?? "", label: nextRoundRow?.label ?? null, bookPoll };
-
-  return {
-    group: { id: group.id, name: group.name, cycleNote: group.cycleNote, memberCount: members.length, members: members.map(memberRef) },
-    me: me ? memberRef(me) : null,
-    currentRound,
-    nextRound,
-    todos: computeTodos(currentRound, bookPoll, memberId),
-  };
+  const bookPoll = bookPollRow ? pollView(bookPollRow, clientId) : null;
+  return { currentRound, bookPoll, todos: computeTodos(currentRound, bookPoll, clientId) };
 }
 
-/** §6.4 우선순위대로 평가해 앞의 2개 */
-export function computeTodos(
-  current: HomeView["currentRound"], bookPoll: PollView | null, memberId: string | null,
-): Todo[] {
+/** §6.3 우선순위대로 평가해 앞의 2개. "내가 했는지"는 clientId 기준 (F-7.6) */
+export function computeTodos(current: RoundView | null, bookPoll: PollView | null, clientId: string | null): Todo[] {
   const todos: Todo[] = [];
   const meetingAt = current?.meetingAt ? new Date(current.meetingAt) : null;
   const dday = meetingAt ? kstDayDiff(meetingAt) : null;
   const placePoll = current?.placePoll ?? null;
 
-  // 후보가 없는 투표는 "할 일"이 아니다
-  if (placePoll?.status === "open" && placePoll.candidates.length > 0 && (!memberId || placePoll.myCandidateIds.length === 0)) {
-    todos.push({ kind: "place_vote", dday, detail: `후보 ${placePoll.candidates.length}곳${memberId ? " · 내 표 없음" : ""}` });
+  if (placePoll?.status === "open" && placePoll.candidates.length > 0 && (!clientId || placePoll.myChecks.length === 0)) {
+    todos.push({ kind: "place_vote", dday, detail: `후보 ${placePoll.candidates.length}곳${clientId ? " · 아직 체크 안 함" : ""}` });
   }
-  if (bookPoll?.status === "open" && bookPoll.candidates.length > 0 && (!memberId || bookPoll.myCandidateIds.length === 0)) {
-    todos.push({ kind: "book_vote", dday, detail: `후보 ${bookPoll.candidates.length}권 · 최대 ${bookPoll.voteLimit}표` });
+  if (bookPoll?.status === "open" && bookPoll.candidates.length > 0 && (!clientId || bookPoll.myChecks.length === 0)) {
+    todos.push({ kind: "book_vote", dday, detail: `후보 ${bookPoll.candidates.length}권${clientId ? " · 아직 체크 안 함" : ""}` });
   }
-  if (memberId && current && meetingAt && meetingAt.getTime() > Date.now()) {
-    const mine = current.attendances.find((a) => a.memberId === memberId);
-    if (!mine) todos.push({ kind: "attendance", dday, detail: "참석 / 불참 / 미정 중 선택" });
+  if (clientId && current && meetingAt && meetingAt.getTime() > Date.now() && !current.attendances.some((a) => a.mine)) {
+    todos.push({ kind: "attendance", dday, detail: "이름을 적고 참석 / 불참 / 미정 선택" });
   }
-  if (!meetingAt) {
-    todos.push({ kind: "schedule", dday: null, detail: "날짜·시간을 등록해 주세요" });
-  }
+  if (!meetingAt) todos.push({ kind: "schedule", dday: null, detail: "날짜·시간을 등록해 주세요" });
   return todos.slice(0, 2);
 }

@@ -1,37 +1,17 @@
-/** 클라이언트·서버가 공유하는 API 응답 타입 (TRD §5) */
-
+/** 클라이언트·서버 공유 API 뷰 타입 (TRD v1.1 §5) */
 export type PollKind = "book" | "place";
 export type PollStatus = "open" | "closed";
 export type AttendanceStatus = "yes" | "no" | "undecided";
 export type TodoKind = "place_vote" | "book_vote" | "attendance" | "schedule";
 
-export interface MemberRef {
-  id: string;
-  nickname: string;
-}
-
-export interface BookView {
-  id: string;
-  title: string;
-  author: string;
-  totalPages: number;
-  coverUrl: string | null;
-}
-
-export interface PlaceView {
-  id: string;
-  name: string;
-  address: string;
-  memo: string | null;
-}
+export interface BookView { id: string; title: string; author: string; totalPages: number; coverUrl: string | null }
+export interface PlaceView { id: string; name: string; address: string; memo: string | null }
 
 export interface CandidateView {
   id: string;
   book: BookView | null;
   place: PlaceView | null;
-  proposedBy: MemberRef;
-  voteCount: number;
-  voters: MemberRef[];
+  checkCount: number;
 }
 
 export interface PollView {
@@ -41,79 +21,36 @@ export interface PollView {
   roundLabel: string | null;
   candidates: CandidateView[];
   candidateLimit: number;
-  /** 1인 상한 = 현재 후보 수 (D-3) */
-  voteLimit: number;
-  myCandidateIds: string[];
-  closedBy: MemberRef | null;
+  /** 이 브라우저가 체크한 후보 (X-Client-Id 있을 때만) */
+  myChecks: string[];
   closedAt: string | null;
   result: CandidateView | null;
   tieCandidates: CandidateView[];
 }
 
-export interface AttendanceView {
-  memberId: string;
-  nickname: string;
-  status: AttendanceStatus;
-}
+export interface AttendanceView { name: string; status: AttendanceStatus; mine: boolean }
+export interface RatingView { name: string; score: number; mine: boolean }
+export interface RatingsSummary { avg: number | null; count: number; list: RatingView[]; mine: number | null }
+export interface ReviewView { id: string; name: string; body: string; spoiler: boolean; createdAt: string; mine: boolean }
 
-export interface ProgressView {
-  memberId: string;
-  nickname: string;
-  currentPage: number;
-  percent: number;
-  completed: boolean;
-  rating: number | null;
-}
+export interface Todo { kind: TodoKind; dday: number | null; detail: string }
 
-export interface CommentView {
+export interface RoundView {
   id: string;
-  authorId: string;
-  nickname: string;
-  body: string;
-  spoiler: boolean;
-  createdAt: string;
-}
-
-export interface ReviewView {
-  id: string;
-  authorId: string;
-  nickname: string;
-  body: string;
-  spoiler: boolean;
-  createdAt: string;
-  comments: CommentView[];
-}
-
-export interface RatingsSummary {
-  avg: number | null;
-  count: number;
-  mine: number | null;
-}
-
-export interface Todo {
-  kind: TodoKind;
-  dday: number | null;
-  detail: string;
+  seq: number;
+  label: string | null;
+  book: BookView | null;
+  meetingAt: string | null;
+  place: PlaceView | null;
+  attendances: AttendanceView[];
+  placePoll: PollView | null;
+  ratings: RatingsSummary;
+  reviews: ReviewView[];
 }
 
 export interface HomeView {
-  group: { id: string; name: string; cycleNote: string | null; memberCount: number; members: MemberRef[] };
-  me: MemberRef | null;
-  currentRound: {
-    id: string;
-    label: string | null;
-    seq: number;
-    book: BookView | null;
-    meetingAt: string | null;
-    place: PlaceView | null;
-    attendances: AttendanceView[];
-    placePoll: PollView | null;
-    progresses: ProgressView[];
-    completedCount: number;
-    ratings: RatingsSummary;
-    reviews: ReviewView[];
-  } | null;
-  nextRound: { id: string; label: string | null; bookPoll: PollView | null };
+  currentRound: RoundView | null;
+  bookPoll: PollView | null;
   todos: Todo[];
 }
 
@@ -121,9 +58,6 @@ export interface BookDetailView {
   round: { id: string; label: string | null; seq: number } | null;
   book: BookView;
   ratings: RatingsSummary;
-  progresses: ProgressView[];
-  completedCount: number;
-  memberCount: number;
   reviews: ReviewView[];
 }
 
@@ -133,14 +67,5 @@ export interface LibraryItem {
   seq: number;
   book: BookView;
   avgRating: number | null;
-}
-
-export interface StatsView {
-  group: { booksRead: number; avgRating: number | null; avgCompletionRate: number | null };
-  mine: { completedCount: number; avgRating: number | null; reviewCount: number } | null;
-}
-
-export interface MemberStat extends MemberRef {
-  completedCount: number;
-  avgRating: number | null;
+  ratingCount: number;
 }

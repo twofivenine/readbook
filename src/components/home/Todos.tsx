@@ -12,7 +12,7 @@ const TITLE: Record<Todo["kind"], string> = {
   schedule: "다음 모임 일정 잡기",
 };
 
-export function Todos({ todos, token, onSchedule, onAttendance }: { todos: Todo[]; token: string; onSchedule: () => void; onAttendance: () => void }) {
+export function Todos({ todos, onSchedule, onAttendance }: { todos: Todo[]; onSchedule: () => void; onAttendance: () => void }) {
   if (todos.length === 0) return null;
   return (
     <div className="flex flex-col gap-2">
@@ -28,13 +28,10 @@ export function Todos({ todos, token, onSchedule, onAttendance }: { todos: Todo[
           </div>
         );
         const cls = clsx("rounded-[9px] p-3 bg-card border-[1.5px] hover:bg-bg transition-colors", i === 0 ? "border-2 border-accent" : "border-ink");
-        if (t.kind === "place_vote") return <Link key={t.kind} href={`/g/${token}/polls/place`} className={cls}>{inner}</Link>;
-        if (t.kind === "book_vote") return <Link key={t.kind} href={`/g/${token}/polls/book`} className={cls}>{inner}</Link>;
-        return (
-          <button key={t.kind} type="button" className={cls} onClick={t.kind === "schedule" ? onSchedule : onAttendance}>
-            {inner}
-          </button>
-        );
+        if (t.kind === "place_vote" || t.kind === "book_vote") {
+          return <Link key={t.kind} href={`/polls/${t.kind === "place_vote" ? "place" : "book"}`} className={cls}>{inner}</Link>;
+        }
+        return <button key={t.kind} type="button" className={cls} onClick={t.kind === "schedule" ? onSchedule : onAttendance}>{inner}</button>;
       })}
     </div>
   );

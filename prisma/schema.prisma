@@ -1,4 +1,4 @@
-// 독서모임 앱 "책읽는 밤" — TRD §4 데이터베이스 스키마
+// 독서모임 앱 "책읽는 밤" — TRD v1.1 §4 (단일 테넌트, 멤버 없음, 브라우저 식별값 기반)
 generator client {
   provider = "prisma-client-js"
 }
@@ -24,53 +24,10 @@ enum AttendanceStatus {
   undecided
 }
 
-/// §4.1 모임
-model Group {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String
-  cycleNote   String?  @map("cycle_note")
-  inviteToken String   @unique @map("invite_token")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  members Member[]
-  rounds  Round[]
-  books   Book[]
-  places  Place[]
-  polls   Poll[]
-
-  @@map("groups")
-}
-
-/// §4.2 멤버 — 닉네임 중복 금지는 migration 의 UNIQUE(group_id, lower(nickname)) 인덱스로 보장
-model Member {
-  id        String   @id @default(uuid()) @db.Uuid
-  groupId   String   @map("group_id") @db.Uuid
-  nickname  String
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  group       Group           @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  votes       Vote[]
-  attendances Attendance[]
-  progresses  Progress[]
-  ratings     Rating[]
-  reviews     Review[]
-  comments    Comment[]
-  booksCreated     Book[]          @relation("BookCreatedBy")
-  placesCreated    Place[]         @relation("PlaceCreatedBy")
-  candidates       PollCandidate[] @relation("CandidateProposedBy")
-  pollsClosed      Poll[]          @relation("PollClosedBy")
-
-  @@index([groupId])
-  @@map("members")
-}
-
-/// §4.3 회차
+/// §4.1 회차
 model Round {
   id        String    @id @default(uuid()) @db.Uuid
-  groupId   String    @map("group_id") @db.Uuid
-  seq       Int
+  seq       Int       @unique
   label     String?
   bookId    String?   @map("book_id") @db.Uuid
   meetingAt DateTime? @map("meeting_at")
@@ -78,206 +35,146 @@ model Round {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
-  group       Group        @relation(fields: [groupId], references: [id], onDelete: Cascade)
   book        Book?        @relation(fields: [bookId], references: [id], onDelete: SetNull)
   place       Place?       @relation(fields: [placeId], references: [id], onDelete: SetNull)
   polls       Poll[]
   attendances Attendance[]
 
-  @@unique([groupId, seq])
-  @@index([groupId, seq(sort: Desc)])
+  @@index([seq(sort: Desc)])
   @@map("rounds")
 }
 
-/// §4.4 책
+/// §4.2 책
 model Book {
   id         String   @id @default(uuid()) @db.Uuid
-  groupId    String   @map("group_id") @db.Uuid
   title      String
   author     String
   totalPages Int      @map("total_pages")
   coverKey   String?  @map("cover_key")
-  createdBy  String   @map("created_by") @db.Uuid
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  group      Group           @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  creator    Member          @relation("BookCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
   rounds     Round[]
   candidates PollCandidate[]
-  progresses Progress[]
   ratings    Rating[]
   reviews    Review[]
 
   @@map("books")
 }
 
-/// §4.5 장소
+/// §4.3 장소
 model Place {
   id        String   @id @default(uuid()) @db.Uuid
-  groupId   String   @map("group_id") @db.Uuid
   name      String
   address   String
   memo      String?
-  createdBy String   @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  group      Group           @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  creator    Member          @relation("PlaceCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
   rounds     Round[]
   candidates PollCandidate[]
 
   @@map("places")
 }
 
-/// §4.6 투표 (책·장소 공통)
+/// §4.4 투표 — 마감자 기록 없음
 model Poll {
   id                String     @id @default(uuid()) @db.Uuid
-  groupId           String     @map("group_id") @db.Uuid
   roundId           String     @map("round_id") @db.Uuid
   kind              PollKind
   status            PollStatus @default(open)
-  closedBy          String?    @map("closed_by") @db.Uuid
   closedAt          DateTime?  @map("closed_at")
   resultCandidateId String?    @map("result_candidate_id") @db.Uuid
   tieCandidateIds   String[]   @default([]) @map("tie_candidate_ids") @db.Uuid
   createdAt         DateTime   @default(now()) @map("created_at")
   updatedAt         DateTime   @updatedAt @map("updated_at")
 
-  group      Group           @relation(fields: [groupId], references: [id], onDelete: Cascade)
   round      Round           @relation(fields: [roundId], references: [id], onDelete: Cascade)
-  closer     Member?         @relation("PollClosedBy", fields: [closedBy], references: [id], onDelete: SetNull)
   candidates PollCandidate[]
-  votes      Vote[]
 
   @@unique([roundId, kind])
   @@map("polls")
 }
 
-/// §4.7 투표 후보
+/// §4.5 후보
 model PollCandidate {
-  id         String   @id @default(uuid()) @db.Uuid
-  pollId     String   @map("poll_id") @db.Uuid
-  bookId     String?  @map("book_id") @db.Uuid
-  placeId    String?  @map("place_id") @db.Uuid
-  proposedBy String   @map("proposed_by") @db.Uuid
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(uuid()) @db.Uuid
+  pollId    String   @map("poll_id") @db.Uuid
+  bookId    String?  @map("book_id") @db.Uuid
+  placeId   String?  @map("place_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  poll     Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
-  book     Book?  @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  place    Place? @relation(fields: [placeId], references: [id], onDelete: Cascade)
-  proposer Member @relation("CandidateProposedBy", fields: [proposedBy], references: [id], onDelete: Cascade)
-  votes    Vote[]
+  poll   Poll        @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  book   Book?       @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  place  Place?      @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  checks VoteCheck[]
 
   @@index([pollId])
   @@map("poll_candidates")
 }
 
-/// §4.8 표
-model Vote {
+/// §4.6 체크 — 누가 눌렀는지는 없음, 브라우저당 후보별 1회
+model VoteCheck {
   id          String   @id @default(uuid()) @db.Uuid
-  pollId      String   @map("poll_id") @db.Uuid
   candidateId String   @map("candidate_id") @db.Uuid
-  memberId    String   @map("member_id") @db.Uuid
+  clientId    String   @map("client_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
 
-  poll      Poll          @relation(fields: [pollId], references: [id], onDelete: Cascade)
   candidate PollCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  member    Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
-  @@unique([candidateId, memberId])
-  @@index([pollId])
-  @@index([memberId])
-  @@map("votes")
+  @@unique([candidateId, clientId])
+  @@index([candidateId])
+  @@map("vote_checks")
 }
 
-/// §4.9 참석 응답 — 집계 없음 (D-6)
+/// §4.7 참석 응답 — 이름 자유 입력
 model Attendance {
   id        String           @id @default(uuid()) @db.Uuid
   roundId   String           @map("round_id") @db.Uuid
-  memberId  String           @map("member_id") @db.Uuid
+  clientId  String           @map("client_id") @db.Uuid
+  name      String
   status    AttendanceStatus
   createdAt DateTime         @default(now()) @map("created_at")
   updatedAt DateTime         @updatedAt @map("updated_at")
 
-  round  Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
-  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  round Round @relation(fields: [roundId], references: [id], onDelete: Cascade)
 
-  @@unique([roundId, memberId])
+  @@unique([roundId, clientId])
   @@index([roundId])
   @@map("attendances")
 }
 
-/// §4.10 진도
-model Progress {
-  id          String    @id @default(uuid()) @db.Uuid
-  memberId    String    @map("member_id") @db.Uuid
-  bookId      String    @map("book_id") @db.Uuid
-  currentPage Int       @map("current_page")
-  completed   Boolean   @default(false)
-  completedAt DateTime? @map("completed_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-
-  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  book   Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
-
-  @@unique([memberId, bookId])
-  @@index([bookId])
-  @@map("progresses")
-}
-
-/// §4.11 별점
+/// §4.8 별점
 model Rating {
   id        String   @id @default(uuid()) @db.Uuid
-  memberId  String   @map("member_id") @db.Uuid
   bookId    String   @map("book_id") @db.Uuid
+  clientId  String   @map("client_id") @db.Uuid
+  name      String
   score     Int      @db.SmallInt
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  book   Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
 
-  @@unique([memberId, bookId])
+  @@unique([bookId, clientId])
   @@index([bookId])
   @@map("ratings")
 }
 
-/// §4.12 한줄평
+/// §4.9 한줄평 — 댓글 없음
 model Review {
   id        String   @id @default(uuid()) @db.Uuid
   bookId    String   @map("book_id") @db.Uuid
-  authorId  String   @map("author_id") @db.Uuid
+  clientId  String   @map("client_id") @db.Uuid
+  name      String
   body      String
   spoiler   Boolean  @default(false)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  book     Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  author   Member    @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  comments Comment[]
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
 
   @@index([bookId, createdAt(sort: Desc)])
   @@map("reviews")
-}
-
-/// §4.13 댓글 — 대댓글 없음
-model Comment {
-  id        String   @id @default(uuid()) @db.Uuid
-  reviewId  String   @map("review_id") @db.Uuid
-  authorId  String   @map("author_id") @db.Uuid
-  body      String
-  spoiler   Boolean  @default(false)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  author Member @relation(fields: [authorId], references: [id], onDelete: Cascade)
-
-  @@index([reviewId, createdAt])
-  @@map("comments")
 }

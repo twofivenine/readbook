@@ -1,26 +1,18 @@
-/**
- * TRD §9 레이트 리밋 (T-9). 인메모리 슬라이딩 윈도.
- * 서버리스에서는 인스턴스 단위로 동작하므로 최소한의 남용 방지 수준이다.
- */
+/** TRD v1.1 §9 레이트 리밋. 인메모리 슬라이딩 윈도 (서버리스에서는 인스턴스 단위) */
 import { errors } from "./errors";
 
 const buckets = new Map<string, number[]>();
-
-export type LimitKind = "write" | "cover" | "group";
-
+export type LimitKind = "write" | "cover";
 const LIMITS: Record<LimitKind, { max: number; windowMs: number }> = {
   write: { max: 60, windowMs: 60_000 },
   cover: { max: 10, windowMs: 3_600_000 },
-  group: { max: 5, windowMs: 3_600_000 },
 };
+const DISABLED = process.env.RATE_LIMIT_DISABLED === "1";
 
 export function clientIp(req: Request): string {
   const fwd = req.headers.get("x-forwarded-for");
   return (fwd?.split(",")[0] ?? req.headers.get("x-real-ip") ?? "unknown").trim();
 }
-
-/** 개발·테스트용: RATE_LIMIT_DISABLED=1 이면 검사하지 않는다 */
-const DISABLED = process.env.RATE_LIMIT_DISABLED === "1";
 
 export function rateLimit(req: Request, kind: LimitKind): void {
   if (DISABLED) return;

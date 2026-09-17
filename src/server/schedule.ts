@@ -1,28 +1,40 @@
-/** TRD §5.2 회차·일정·참석 */
+/** TRD v1.1 §5.2 일정·참석 */
 import type { AttendanceStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { errors } from "@/lib/errors";
+import { normalizeName } from "@/lib/name";
 import { getOrCreateHomeRound } from "./rounds";
 
-export async function setMeeting(groupId: string, meetingAt: Date | null) {
-  const round = await getOrCreateHomeRound(groupId);
+export async function setMeeting(meetingAt: Date | null) {
+  const round = await getOrCreateHomeRound();
   return prisma.round.update({ where: { id: round.id }, data: { meetingAt } });
 }
 
-export async function setLabel(groupId: string, label: string | null) {
-  const round = await getOrCreateHomeRound(groupId);
+export async function setLabel(label: string | null) {
+  const round = await getOrCreateHomeRound();
   return prisma.round.update({ where: { id: round.id }, data: { label } });
 }
 
-/** F-4.5 모임일 전까지만 변경 */
-export async function setAttendance(groupId: string, memberId: string, status: AttendanceStatus) {
-  const round = await getOrCreateHomeRound(groupId);
+async function openRound() {
+  const round = await getOrCreateHomeRound();
   if (round.meetingAt && round.meetingAt.getTime() <= Date.now()) {
     throw errors.conflict("MEETING_PASSED", "이미 지난 모임이라 참석 여부를 바꿀 수 없어요.");
   }
+  return round;
+}
+
+/** F-4.3, 4.5 내 응답 생성·수정 */
+export async function setAttendance(clientId: string, name: string | null | undefined, status: AttendanceStatus) {
+  const round = await openRound();
+  const n = normalizeName(name);
   return prisma.attendance.upsert({
-    where: { roundId_memberId: { roundId: round.id, memberId } },
-    create: { roundId: round.id, memberId, status },
-    update: { status },
+    where: { roundId_clientId: { roundId: round.id, clientId } },
+    create: { roundId: round.id, clientId, name: n, status },
+    update: { name: n, status },
   });
+}
+
+export async function deleteAttendance(clientId: string) {
+  const round = await openRound();
+  await prisma.attendance.deleteMany({ where: { roundId: round.id, clientId } });
 }

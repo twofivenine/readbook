@@ -2,20 +2,16 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { Prisma } from "@prisma/client";
 
-/** API 오류 코드 (TRD §5: 401 / 403 / 404 / 409 / 422 / 429) */
+/** API 오류 (TRD v1.1 §5: 400 / 403 / 404 / 409 / 422 / 429) */
 export class ApiError extends Error {
-  constructor(
-    public readonly status: number,
-    public readonly code: string,
-    message: string,
-  ) {
+  constructor(public readonly status: number, public readonly code: string, message: string) {
     super(message);
   }
 }
 
 export const errors = {
-  unauthorized: () => new ApiError(401, "UNAUTHORIZED", "멤버 정보가 없거나 유효하지 않습니다."),
-  forbidden: () => new ApiError(403, "FORBIDDEN", "작성자만 수정·삭제할 수 있습니다."),
+  badRequest: (message: string) => new ApiError(400, "BAD_REQUEST", message),
+  forbidden: () => new ApiError(403, "FORBIDDEN", "이 브라우저에서 쓴 글만 수정·삭제할 수 있어요."),
   notFound: (what = "요청한 대상") => new ApiError(404, "NOT_FOUND", `${what}을(를) 찾을 수 없습니다.`),
   conflict: (code: string, message: string) => new ApiError(409, code, message),
   invalid: (message: string) => new ApiError(422, "INVALID", message),
@@ -24,7 +20,6 @@ export const errors = {
 
 type Handler<Ctx> = (req: Request, ctx: Ctx) => Promise<Response>;
 
-/** 라우트 핸들러 공통 래퍼: ApiError / ZodError → JSON 응답 */
 export function route<Ctx>(handler: Handler<Ctx>): Handler<Ctx> {
   return async (req, ctx) => {
     try {
@@ -34,11 +29,9 @@ export function route<Ctx>(handler: Handler<Ctx>): Handler<Ctx> {
         return NextResponse.json({ error: { code: e.code, message: e.message } }, { status: e.status });
       }
       if (e instanceof ZodError) {
-        const message = e.issues.map((i) => i.message).join(" ");
-        return NextResponse.json({ error: { code: "INVALID", message } }, { status: 422 });
+        return NextResponse.json({ error: { code: "INVALID", message: e.issues.map((i) => i.message).join(" ") } }, { status: 422 });
       }
       console.error(e);
-      // DB 연결·초기화 실패는 원인을 알 수 있게 503 으로 구분한다 (DATABASE_URL 미설정, 마이그레이션 미적용 등)
       if (e instanceof Prisma.PrismaClientInitializationError) {
         return NextResponse.json(
           { error: { code: "DB_UNAVAILABLE", message: "데이터베이스에 연결할 수 없습니다. DATABASE_URL 설정을 확인해 주세요." } },
@@ -47,7 +40,7 @@ export function route<Ctx>(handler: Handler<Ctx>): Handler<Ctx> {
       }
       if (e instanceof Prisma.PrismaClientKnownRequestError && (e.code === "P2021" || e.code === "P2022")) {
         return NextResponse.json(
-          { error: { code: "DB_NOT_MIGRATED", message: "데이터베이스 스키마가 적용되지 않았습니다. `prisma migrate deploy`를 실행해 주세요." } },
+          { error: { code: "DB_NOT_MIGRATED", message: "데이터베이스 스키마가 적용되지 않았습니다. `npm run db:migrate`를 실행해 주세요." } },
           { status: 503 },
         );
       }
@@ -58,3 +51,4 @@ export function route<Ctx>(handler: Handler<Ctx>): Handler<Ctx> {
 }
 
 export const json = <T>(data: T, init?: ResponseInit) => NextResponse.json(data, init);
+export const noContent = () => new Response(null, { status: 204 });

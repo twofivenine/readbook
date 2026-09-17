@@ -2,11 +2,7 @@
 import Link from "next/link";
 import { clsx } from "@/lib/clsx";
 
-type BtnProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "outline" | "accent" | "ghost" | "danger";
-  size?: "sm" | "md";
-  full?: boolean;
-};
+type BtnProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "outline" | "accent" | "ghost" | "danger"; size?: "sm" | "md"; full?: boolean };
 
 /** 와이어프레임의 알약형 버튼 */
 export function Button({ variant = "outline", size = "md", full, className, ...rest }: BtnProps) {
@@ -43,86 +39,58 @@ export function LinkButton({ href, children, variant = "outline", className }: {
   );
 }
 
-export function Card({ children, className, accent }: { children: React.ReactNode; className?: string; accent?: boolean }) {
-  return (
-    <section
-      className={clsx(
-        "rounded-[10px] bg-card border-[1.5px] p-4 flex flex-col gap-3",
-        accent ? "border-accent border-2" : "border-line",
-        className,
-      )}
-    >
-      {children}
-    </section>
-  );
+export function Card({ children, className, id }: { children: React.ReactNode; className?: string; id?: string }) {
+  return <section id={id} className={clsx("rounded-[10px] bg-card border-[1.5px] border-line p-4 flex flex-col gap-3 scroll-mt-16", className)}>{children}</section>;
 }
 
 export function Label({ children, accent, className }: { children: React.ReactNode; accent?: boolean; className?: string }) {
   return <div className={clsx("label-mono", accent && "text-accent!", className)}>{children}</div>;
 }
 
-export function Chip({ children, active, onClick, className }: { children: React.ReactNode; active?: boolean; onClick?: () => void; className?: string }) {
-  const Comp = onClick ? "button" : "span";
-  return (
-    <Comp
-      type={onClick ? "button" : undefined}
-      onClick={onClick}
-      className={clsx(
-        "inline-flex items-center rounded-full border-[1.5px] px-3 py-1.5 text-[14px] transition-colors",
-        active ? "border-accent border-2 text-accent bg-accent-soft font-semibold" : "border-line bg-white",
-        onClick && "hover:border-ink",
-        className,
-      )}
-    >
-      {children}
-    </Comp>
-  );
-}
-
-export function Divider({ dashed = true, className }: { dashed?: boolean; className?: string }) {
-  return <hr className={clsx("border-0 border-t-[1.5px] border-line", dashed && "border-dashed", className)} />;
+export function Divider({ className }: { className?: string }) {
+  return <hr className={clsx("border-0 border-t-[1.5px] border-dashed border-line", className)} />;
 }
 
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      {...props}
-      className={clsx(
-        "w-full rounded-md border-[1.5px] border-line bg-white px-3 py-2.5 text-[15px] placeholder:text-[#9a958b] focus:border-ink",
-        props.className,
-      )}
-    />
-  );
+  return <input {...props} className={clsx("w-full rounded-md border-[1.5px] border-line bg-white px-3 py-2.5 text-[15px] placeholder:text-[#9a958b] focus:border-ink", props.className)} />;
 }
 
 export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return (
-    <textarea
-      {...props}
-      className={clsx(
-        "w-full rounded-md border-[1.5px] border-line bg-white px-3 py-2.5 text-[15px] placeholder:text-[#9a958b] focus:border-ink resize-y",
-        props.className,
-      )}
-    />
-  );
+  return <textarea {...props} className={clsx("w-full rounded-md border-[1.5px] border-line bg-white px-3 py-2.5 text-[15px] placeholder:text-[#9a958b] focus:border-ink resize-y", props.className)} />;
 }
 
-/** ★ 표시 (읽기 전용) */
-export function Stars({ value, size = 14 }: { value: number | null; size?: number }) {
-  if (value === null) return <span className="text-muted">–</span>;
-  return (
-    <span className="text-star tracking-tight" style={{ fontSize: size }} aria-label={`별점 ${value}`}>
-      {"★".repeat(Math.round(value))}
-      <span className="text-line">{"★".repeat(5 - Math.round(value))}</span>
-    </span>
-  );
+/** 이름 입력 칸 (F-1.4, 1.5) */
+export function NameInput({ value, onChange, className }: { value: string; onChange: (v: string) => void; className?: string }) {
+  return <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="이름 (비우면 익명)" maxLength={12} aria-label="이름" className={className} />;
 }
 
 export function StarValue({ value }: { value: number | null }) {
   return <span className="text-star font-semibold">{value === null ? <span className="text-muted">–</span> : `★${value}`}</span>;
 }
 
-/** 표지 (없으면 플레이스홀더, F-10.3) */
+/** 별점 선택 (1~5) */
+export function StarPicker({ value, onChange, disabled }: { value: number | null; onChange: (v: number) => void; disabled?: boolean }) {
+  return (
+    <div className="flex" role="radiogroup" aria-label="별점">
+      {[1, 2, 3, 4, 5].map((s) => (
+        <button
+          key={s}
+          type="button"
+          role="radio"
+          aria-checked={value === s}
+          aria-label={`${s}점`}
+          disabled={disabled}
+          onClick={() => onChange(s)}
+          className={clsx("text-[28px] leading-none px-0.5 disabled:opacity-50", value !== null && s <= value ? "text-star" : "text-line hover:text-star/60")}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** 표지 (없으면 플레이스홀더, F-9.3) */
 export function Cover({ url, title, className }: { url: string | null; title: string; className?: string }) {
   return (
     <div className={clsx("shrink-0 rounded-md border-[1.5px] border-line bg-bg overflow-hidden flex items-center justify-center", className)} style={{ aspectRatio: "2 / 3" }}>
@@ -136,10 +104,6 @@ export function Cover({ url, title, className }: { url: string | null; title: st
   );
 }
 
-export function Empty({ children }: { children: React.ReactNode }) {
-  return <div className="text-[14px] text-muted py-2">{children}</div>;
-}
-
 export function ErrorText({ children }: { children?: React.ReactNode }) {
   if (!children) return null;
   return <div className="text-[13px] text-danger" role="alert">{children}</div>;
@@ -147,6 +111,5 @@ export function ErrorText({ children }: { children?: React.ReactNode }) {
 
 export function DdayBadge({ dday, accent }: { dday: number | null; accent?: boolean }) {
   if (dday === null) return null;
-  const text = dday === 0 ? "D-Day" : dday > 0 ? `D-${dday}` : `D+${-dday}`;
-  return <span className={clsx("label-mono whitespace-nowrap", accent && "text-accent!")}>{text}</span>;
+  return <span className={clsx("label-mono whitespace-nowrap", accent && "text-accent!")}>{dday === 0 ? "D-Day" : dday > 0 ? `D-${dday}` : `D+${-dday}`}</span>;
 }
