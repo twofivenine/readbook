@@ -14,8 +14,14 @@ import { addMonths, thisMonthLabel } from "@/lib/time";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
+/** seq 는 DB 기본값에 기대지 않고 코드에서 max+1 로 채운다 (마이그레이션 전 DB에서도 동작) */
+export async function nextSeq(db: Db = prisma) {
+  const agg = await db.round.aggregate({ _max: { seq: true } });
+  return (agg._max.seq ?? 0) + 1;
+}
+
 export async function getOrCreateRoundByLabel(label: string, db: Db = prisma) {
-  return (await db.round.findUnique({ where: { label } })) ?? db.round.create({ data: { label } });
+  return (await db.round.findUnique({ where: { label } })) ?? db.round.create({ data: { label, seq: await nextSeq(db) } });
 }
 
 export const getCurrentRound = (db: Db = prisma, now = new Date()) =>

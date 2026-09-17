@@ -2,7 +2,7 @@
 import { prisma } from "@/lib/prisma";
 import { errors } from "@/lib/errors";
 import type { LibraryItem } from "@/lib/types";
-import { getPastRounds } from "./rounds";
+import { getPastRounds, nextSeq } from "./rounds";
 import { bookView } from "./views";
 
 export async function getLibrary(): Promise<LibraryItem[]> {
@@ -31,7 +31,7 @@ export async function addBookToMonth(label: string, input: { title: string; auth
     const book = await db.book.create({ data: { title: input.title, author: input.author, totalPages: input.totalPages, coverKey: input.coverKey ?? null } });
     const round = existing
       ? await db.round.update({ where: { id: existing.id }, data: { bookId: book.id } })
-      : await db.round.create({ data: { label, bookId: book.id } });
+      : await db.round.create({ data: { label, bookId: book.id, seq: await nextSeq(db) } });
     return { roundId: round.id, label: round.label, bookId: book.id };
   });
 }
