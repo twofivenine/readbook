@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { PollView, Todo } from "@/lib/types";
 import { Card, Cover, DdayPill, Label, LinkButton, Title } from "@/components/ui";
 import { clsx } from "@/lib/clsx";
+import { monthWord } from "@/lib/time";
 
 const TITLE: Record<Todo["kind"], string> = {
   place_vote: "모임 장소, 아직 안 고르셨어요",
@@ -18,10 +19,7 @@ const CTA: Record<Todo["kind"], string> = {
   schedule: "일정 등록하기",
 };
 
-function monthPrefix(label: string | null | undefined) {
-  const m = label ? Number(label.split("-")[1]) : NaN;
-  return Number.isFinite(m) ? `${m}월에 읽을 책, 아직 안 고르셨어요` : TITLE.book_vote;
-}
+const monthPrefix = (label: string | null | undefined) => (label ? `${monthWord(label)}에 읽을 책, 아직 안 고르셨어요` : TITLE.book_vote);
 
 export function Todos({ todos, bookPoll, onSchedule, onAttendance }: { todos: Todo[]; bookPoll: PollView | null; onSchedule: () => void; onAttendance: () => void }) {
   if (todos.length === 0) return null;

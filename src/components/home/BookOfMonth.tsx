@@ -5,24 +5,44 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { useWrite } from "@/lib/hooks";
 import { rememberName, useClientStore } from "@/lib/clientStore";
-import type { BookView, RatingsSummary, RoundView } from "@/lib/types";
+import type { BookView, RatingsSummary, RoundView, UpcomingRound } from "@/lib/types";
+import { monthWord } from "@/lib/time";
 import { Button, Card, Cover, Divider, ErrorText, Input, Label, NameInput, StarPicker, Title } from "@/components/ui";
 import { ReviewsSection } from "./Reviews";
 
-function monthWord(label: string | null) {
-  const m = label ? Number(label.split("-")[1]) : NaN;
-  return Number.isFinite(m) ? `${m}월의 책` : "이달의 책";
+function Upcoming({ upcoming }: { upcoming: UpcomingRound[] }) {
+  if (upcoming.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      <Label>미리 정해진 책</Label>
+      <ul className="flex flex-col gap-2">
+        {upcoming.map((u) => (
+          <li key={u.id} className="flex items-center gap-3 text-[13.5px]">
+            <Cover url={u.book.coverUrl} title={u.book.title} className="w-[28px]" />
+            <span className="label-mono tracking-normal! w-[36px]">{monthWord(u.label)}</span>
+            <span className="truncate">{u.book.title}</span>
+            <span className="text-mono truncate hidden sm:inline">· {u.book.author}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="text-[12px] text-mono">그 달이 되면 이달의 책으로 올라와요</div>
+    </div>
+  );
 }
 
-export function BookOfMonth({ round }: { round: RoundView | null }) {
+export function BookOfMonth({ round, upcoming, thisMonth }: { round: RoundView | null; upcoming: UpcomingRound[]; thisMonth: string }) {
   const book = round?.book ?? null;
   const [editing, setEditing] = useState(false);
   if (!book) {
     return (
-      <Card>
-        <Title>이달의 책</Title>
-        <div className="text-[15px] text-muted">아직 확정된 책이 없어요. 다음 책 투표를 마감하면 여기에 표시돼요.</div>
+      <Card className="gap-4">
+        <Title>{monthWord(thisMonth)}의 책</Title>
+        <div className="text-[15px] text-muted">
+          {upcoming.length > 0 ? "이번 달 책은 아직 없어요." : "아직 확정된 책이 없어요. 다음 책 투표를 마감하면 여기에 표시돼요."}
+        </div>
         <Link href="/polls/book" className="text-[14px] text-accent">다음 책 투표로 →</Link>
+        {upcoming.length > 0 && <Divider />}
+        <Upcoming upcoming={upcoming} />
       </Card>
     );
   }
@@ -30,11 +50,11 @@ export function BookOfMonth({ round }: { round: RoundView | null }) {
   return (
     <Card id="book-of-month" className="gap-5">
       <div className="flex justify-between items-baseline gap-3">
-        <Title>{monthWord(round!.label)}</Title>
+        <Title>{monthWord(round!.label)}의 책</Title>
         <span className="text-[13px] text-mono">{r.count}명 별점 · 평균 {r.avg === null ? "–" : r.avg.toFixed(1)}</span>
       </div>
       {editing ? (
-        <BookEditForm book={book} onDone={() => setEditing(false)} />
+        <BookEditForm book={book} roundId={round!.id} label={round!.label} onDone={() => setEditing(false)} />
       ) : (
         <div className="flex gap-4 md:gap-5">
           <Cover url={book.coverUrl} title={book.title} className="w-[84px] md:w-[104px]" />
@@ -67,6 +87,12 @@ export function BookOfMonth({ round }: { round: RoundView | null }) {
       )}
       <Divider />
       <ReviewsSection bookId={book.id} reviews={round!.reviews} />
+      {upcoming.length > 0 && (
+        <>
+          <Divider />
+          <Upcoming upcoming={upcoming} />
+        </>
+      )}
     </Card>
   );
 }
@@ -93,14 +119,22 @@ export function RatingSection({ bookId, ratings }: { bookId: string; ratings: Ra
   );
 }
 
-function BookEditForm({ book, onDone }: { book: BookView; onDone: () => void }) {
+function BookEditForm({ book, roundId, label, onDone }: { book: BookView; roundId: string; label: string; onDone: () => void }) {
   const [title, setTitle] = useState(book.title);
   const [author, setAuthor] = useState(book.author);
   const [pages, setPages] = useState(String(book.totalPages));
-  const save = useWrite(() => api(`/books/${book.id}`, { method: "PATCH", json: { title, author, totalPages: Number(pages) } }));
+  const [month, setMonth] = useState(label);
+  const save = useWrite(async () => {
+    await api(`/books/${book.id}`, { method: "PATCH", json: { title, author, totalPages: Number(pages) } });
+    if (month !== label) await api(`/rounds/${roundId}/label`, { method: "PATCH", json: { label: month } });
+  });
   return (
     <form className="flex flex-col gap-2" onSubmit={(e) => { e.preventDefault(); save.mutate(undefined, { onSuccess: onDone }); }}>
       <Label>책 정보 수정 · 누구나</Label>
+      <label className="flex items-center gap-3 text-[13px] text-muted">
+        <span className="w-[52px] shrink-0">읽는 달</span>
+        <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} required aria-label="읽는 달" className="max-w-[180px]" />
+      </label>
       <Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} placeholder="제목" required aria-label="제목" />
       <Input value={author} onChange={(e) => setAuthor(e.target.value)} maxLength={50} placeholder="지은이" required aria-label="지은이" />
       <Input type="number" inputMode="numeric" min={1} max={9999} value={pages} onChange={(e) => setPages(e.target.value)} placeholder="총 쪽수" required aria-label="총 쪽수" />

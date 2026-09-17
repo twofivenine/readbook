@@ -19,10 +19,25 @@ function splitYmd(s: string): [number, number, number] {
   return [y, m - 1, d];
 }
 
+/** 이번 달 label (KST) `YYYY-MM` */
+export function thisMonthLabel(base: Date = new Date()): string {
+  return kstDateString(base).slice(0, 7);
+}
+
+/** label 에 n개월 더하기 */
+export function addMonths(label: string, n: number): string {
+  const [y, m] = label.split("-").map(Number);
+  const total = y * 12 + (m - 1) + n;
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`;
+}
+
 /** 회차 label 기본값: 기준 시각의 다음 달 (KST) */
-export function nextMonthLabel(base: Date = new Date()): string {
-  const [y, m] = kstDateString(base).split("-").map(Number);
-  return `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}`;
+export const nextMonthLabel = (base: Date = new Date()): string => addMonths(thisMonthLabel(base), 1);
+
+/** "2026-10" → "10월" */
+export function monthWord(label: string | null | undefined): string {
+  const m = label ? Number(label.split("-")[1]) : NaN;
+  return Number.isFinite(m) ? `${m}월` : "이달";
 }
 
 export function formatMeetingAt(iso: string): { date: string; time: string } {

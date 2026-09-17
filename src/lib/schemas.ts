@@ -5,7 +5,8 @@ const name = z.string().max(40).optional().nullable();
 export const meetingSchema = z.object({
   meetingAt: z.string().datetime({ offset: true, message: "날짜·시간 형식이 올바르지 않아요." }).nullable(),
 });
-export const labelSchema = z.object({ label: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "표시 월은 YYYY-MM 형식이에요.").nullable() });
+const monthLabel = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "표시 월은 YYYY-MM 형식이에요.");
+export const labelSchema = z.object({ label: monthLabel });
 export const attendanceSchema = z.object({ name, status: z.enum(["yes", "no", "undecided"]) });
 export const pollKindSchema = z.enum(["book", "place"]);
 
@@ -16,6 +17,7 @@ export const bookInputSchema = z.object({
   coverKey: z.string().max(200).optional().nullable(),
 });
 export const bookPatchSchema = bookInputSchema.partial();
+export const pastBookSchema = bookInputSchema.extend({ label: monthLabel });
 
 export const placeInputSchema = z.object({
   name: z.string().trim().min(1, "장소명을 입력해 주세요.").max(50, "장소명은 50자까지예요."),

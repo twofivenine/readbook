@@ -37,7 +37,7 @@ export async function getBookDetail(bookId: string, clientId: string | null): Pr
   const [ratings, reviews, round] = await Promise.all([
     prisma.rating.findMany({ where: { bookId }, orderBy: { createdAt: "asc" } }),
     prisma.review.findMany({ where: { bookId }, orderBy: { createdAt: "desc" } }),
-    prisma.round.findFirst({ where: { bookId }, orderBy: { seq: "desc" } }),
+    prisma.round.findFirst({ where: { bookId }, orderBy: { label: "desc" } }),
   ]);
   return {
     round: round ? { id: round.id, label: round.label, seq: round.seq } : null,

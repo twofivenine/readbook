@@ -4,6 +4,7 @@ import Link from "next/link";
 import { use } from "react";
 import { useRoundDetail } from "@/lib/hooks";
 import { Card, Cover, Divider, Label, Title } from "@/components/ui";
+import { monthWord } from "@/lib/time";
 import { ReviewsSection } from "@/components/home/Reviews";
 
 export default function RoundDetailPage({ params }: { params: Promise<{ roundId: string }> }) {
@@ -16,7 +17,7 @@ export default function RoundDetailPage({ params }: { params: Promise<{ roundId:
     <div className="flex flex-col gap-4 max-w-[640px] mx-auto">
       <div className="flex items-center gap-3">
         <Link href="/library" className="text-[17px] text-muted hover:text-ink" aria-label="서재로">←</Link>
-        <Title>{d.round?.label ?? `${d.round?.seq}회차`}</Title>
+        <Title>{d.round ? `${monthWord(d.round.label)}의 책` : "지난 책"}</Title>
       </div>
       <Card className="gap-5">
         <div className="flex gap-4 md:gap-5">

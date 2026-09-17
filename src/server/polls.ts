@@ -3,32 +3,36 @@ import { randomInt } from "node:crypto";
 import { Prisma, type PollKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { errors } from "@/lib/errors";
-import { nextMonthLabel } from "@/lib/time";
 import { coverStorage } from "@/lib/storage";
-import { findHomeRound, findNextRound, getCurrentRound, getOrCreateHomeRound, getOrCreateNextRound } from "./rounds";
+import { findHomeRound, getOrCreateHomeRound, getOrCreateNextRound } from "./rounds";
 import { CANDIDATE_LIMIT, pollInclude, pollView } from "./views";
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
+/** 진행 중인 책 투표 (가장 이른 달) */
+const findOpenBookPoll = (db: Db) => db.poll.findFirst({ where: { kind: "book", status: "open" }, orderBy: { round: { label: "asc" } }, include: pollInclude });
+
 /**
  * 조회 대상 투표.
- * - book: 다음 회차의 투표. 아직 없으면(방금 확정된 직후) 현재 회차의 마감된 투표 (F-2.13, 2.14)
- * - place: 현재(홈) 회차의 투표
+ * - book: 진행 중인 투표가 있으면 그것. 없으면 가장 최근에 마감된 투표 (결과·재투표, F-2.13, 2.14)
+ * - place: 홈 회차의 투표
  */
 export async function findPoll(kind: PollKind, db: Db = prisma) {
   if (kind === "book") {
-    const next = await findNextRound(db);
-    const nextPoll = next ? await db.poll.findUnique({ where: { roundId_kind: { roundId: next.id, kind } }, include: pollInclude }) : null;
-    if (nextPoll) return nextPoll;
-    const current = await getCurrentRound(db);
-    return current ? db.poll.findUnique({ where: { roundId_kind: { roundId: current.id, kind } }, include: pollInclude }) : null;
+    return (await findOpenBookPoll(db)) ?? db.poll.findFirst({ where: { kind, status: "closed" }, orderBy: { round: { label: "desc" } }, include: pollInclude });
   }
   const home = await findHomeRound(db);
   return home ? db.poll.findUnique({ where: { roundId_kind: { roundId: home.id, kind } }, include: pollInclude }) : null;
 }
 
 async function getOrCreatePoll(kind: PollKind, db: Prisma.TransactionClient) {
-  const round = kind === "book" ? await getOrCreateNextRound(db) : await getOrCreateHomeRound(db);
+  if (kind === "book") {
+    const open = await findOpenBookPoll(db);
+    if (open) return open;
+    const round = await getOrCreateNextRound(db);
+    return (await db.poll.findUnique({ where: { roundId_kind: { roundId: round.id, kind } } })) ?? db.poll.create({ data: { roundId: round.id, kind } });
+  }
+  const round = await getOrCreateHomeRound(db);
   return (await db.poll.findUnique({ where: { roundId_kind: { roundId: round.id, kind } } })) ?? db.poll.create({ data: { roundId: round.id, kind } });
 }
 
@@ -116,8 +120,8 @@ export async function closePoll(kind: PollKind) {
       data: { status: "closed", closedAt: now, resultCandidateId: result.id, tieCandidateIds: top.length > 1 ? top.map((c) => c.id) : [] },
     });
     if (kind === "book") {
-      const round = await db.round.findUniqueOrThrow({ where: { id: fresh.roundId } });
-      await db.round.update({ where: { id: round.id }, data: { bookId: result.bookId, label: round.label ?? nextMonthLabel(now) } });
+      // 회차의 월(label)은 투표 생성 시 정해져 있다. 확정 후 "이달의 책"이 되는 시점은 그 달이 왔을 때 (§rounds)
+      await db.round.update({ where: { id: fresh.roundId }, data: { bookId: result.bookId } });
     } else {
       await db.round.update({ where: { id: fresh.roundId }, data: { placeId: result.placeId } });
     }

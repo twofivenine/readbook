@@ -8,7 +8,7 @@ export const bookView = (b: Book): BookView => ({ id: b.id, title: b.title, auth
 export const placeView = (p: Place): PlaceView => ({ id: p.id, name: p.name, address: p.address, memo: p.memo });
 
 export type CandidateWithRelations = PollCandidate & { book: Book | null; place: Place | null; checks: VoteCheck[] };
-export type PollWithRelations = Poll & { candidates: CandidateWithRelations[]; round: { label: string | null } };
+export type PollWithRelations = Poll & { candidates: CandidateWithRelations[]; round: { label: string } };
 
 export const pollInclude = {
   candidates: { orderBy: { createdAt: "asc" as const }, include: { book: true, place: true, checks: true } },

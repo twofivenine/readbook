@@ -10,8 +10,12 @@ export async function setMeeting(meetingAt: Date | null) {
   return prisma.round.update({ where: { id: round.id }, data: { meetingAt } });
 }
 
-export async function setLabel(label: string | null) {
-  const round = await getOrCreateHomeRound();
+/** 표시 월 수정 — 같은 달 회차가 이미 있으면 409 */
+export async function setLabel(roundId: string | "current", label: string) {
+  const round = roundId === "current" ? await getOrCreateHomeRound() : await prisma.round.findUnique({ where: { id: roundId } });
+  if (!round) throw errors.notFound("회차");
+  const clash = await prisma.round.findUnique({ where: { label } });
+  if (clash && clash.id !== round.id) throw errors.conflict("LABEL_TAKEN", `${label}에는 이미 다른 회차가 있어요.`);
   return prisma.round.update({ where: { id: round.id }, data: { label } });
 }
 

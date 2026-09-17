@@ -30,7 +30,7 @@ export default function HomePage() {
       {/* 모바일: 다음 모임 → 이달의 책 → 투표 → 지난 책 / 데스크톱: 좌 이달의 책, 우 나머지 */}
       <div className="grid gap-5 md:gap-6 md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] md:items-start">
         <div className="contents md:flex md:flex-col md:gap-6">
-          <div className="order-2 md:order-none"><BookOfMonth round={round} /></div>
+          <div className="order-2 md:order-none"><BookOfMonth round={round} upcoming={d.upcoming} thisMonth={d.thisMonth} /></div>
         </div>
         <div className="contents md:flex md:flex-col md:gap-6">
           <div className="order-1 md:order-none"><NextMeeting round={round} editing={editingMeeting} setEditing={setEditingMeeting} highlight={attendanceHl} /></div>

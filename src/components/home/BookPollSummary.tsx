@@ -3,13 +3,10 @@
 import Link from "next/link";
 import type { PollView } from "@/lib/types";
 import { Bar, Card, Title } from "@/components/ui";
+import { monthWord } from "@/lib/time";
 import { CheckButton } from "@/components/CheckButton";
 import { clsx } from "@/lib/clsx";
 
-function monthWord(label: string | null) {
-  const m = label ? Number(label.split("-")[1]) : NaN;
-  return Number.isFinite(m) ? `${m}월 책 투표` : "다음 책 투표";
-}
 
 export function BookPollSummary({ poll }: { poll: PollView | null }) {
   const open = poll?.status === "open";
@@ -18,7 +15,7 @@ export function BookPollSummary({ poll }: { poll: PollView | null }) {
   return (
     <Card className="gap-3.5">
       <div className="flex justify-between items-baseline gap-3">
-        <Title size="sm">{monthWord(poll?.roundLabel ?? null)}</Title>
+        <Title size="sm">{poll ? `${monthWord(poll.roundLabel)} 책 투표` : "다음 책 투표"}</Title>
         {poll && (
           <span className={clsx("label-mono tracking-normal!", open && voted && "text-accent!")}>
             {!open ? "마감됨" : voted ? "투표함 ✓" : "진행 중"}

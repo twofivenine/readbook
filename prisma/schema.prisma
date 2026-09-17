@@ -24,11 +24,11 @@ enum AttendanceStatus {
   undecided
 }
 
-/// §4.1 회차
+/// §4.1 회차 — 월(label, YYYY-MM)이 회차의 정체성. 접속한 달 기준으로 "이달의 책"이 정해진다
 model Round {
   id        String    @id @default(uuid()) @db.Uuid
-  seq       Int       @unique
-  label     String?
+  seq       Int       @unique @default(autoincrement())
+  label     String    @unique
   bookId    String?   @map("book_id") @db.Uuid
   meetingAt DateTime? @map("meeting_at")
   placeId   String?   @map("place_id") @db.Uuid
@@ -40,7 +40,7 @@ model Round {
   polls       Poll[]
   attendances Attendance[]
 
-  @@index([seq(sort: Desc)])
+  @@index([label(sort: Desc)])
   @@map("rounds")
 }
 

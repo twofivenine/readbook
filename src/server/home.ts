@@ -2,13 +2,15 @@
 import { prisma } from "@/lib/prisma";
 import type { HomeView, PollView, RoundView, Todo } from "@/lib/types";
 import { kstDayDiff } from "@/lib/time";
-import { findHomeRound } from "./rounds";
+import { findHomeRound, getUpcomingRounds } from "./rounds";
+import { thisMonthLabel } from "@/lib/time";
 import { findPoll } from "./polls";
 import { bookView, placeView, pollInclude, pollView, ratingsSummary, reviewView } from "./views";
 
 export async function buildHome(clientId: string | null): Promise<HomeView> {
-  const homeRow = await findHomeRound();
-  const [homeRound, bookPollRow] = await Promise.all([
+  const now = new Date();
+  const homeRow = await findHomeRound(prisma, now);
+  const [homeRound, bookPollRow, upcomingRows] = await Promise.all([
     homeRow
       ? prisma.round.findUnique({
           where: { id: homeRow.id },
@@ -16,6 +18,7 @@ export async function buildHome(clientId: string | null): Promise<HomeView> {
         })
       : null,
     findPoll("book"),
+    getUpcomingRounds(prisma, now),
   ]);
 
   let currentRound: RoundView | null = null;
@@ -42,7 +45,11 @@ export async function buildHome(clientId: string | null): Promise<HomeView> {
     };
   }
   const bookPoll = bookPollRow ? pollView(bookPollRow, clientId) : null;
-  return { currentRound, bookPoll, todos: computeTodos(currentRound, bookPoll, clientId) };
+  // 홈 회차가 upcoming(다음 달) 회차인 경우 "이달의 책"에는 표시하지 않고 upcoming 에만 둔다
+  const thisMonth = thisMonthLabel(now);
+  const upcoming = upcomingRows.map((r) => ({ id: r.id, label: r.label, book: bookView(r.book!) }));
+  if (currentRound && currentRound.label > thisMonth) currentRound = { ...currentRound, book: null, ratings: ratingsSummary([], clientId), reviews: [] };
+  return { thisMonth, currentRound, upcoming, bookPoll, todos: computeTodos(currentRound, bookPoll, clientId) };
 }
 
 /** §6.3 우선순위대로 평가해 앞의 2개. "내가 했는지"는 clientId 기준 (F-7.6) */

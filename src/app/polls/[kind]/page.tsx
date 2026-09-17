@@ -6,16 +6,12 @@ import { use, useState } from "react";
 import { api } from "@/lib/api";
 import { usePoll, useWrite } from "@/lib/hooks";
 import type { CandidateView, PollKind, PollView } from "@/lib/types";
-import { formatDateTime } from "@/lib/time";
+import { formatDateTime, monthWord } from "@/lib/time";
 import { Bar, Button, Card, Cover, Divider, ErrorText, Input, Label, Title } from "@/components/ui";
 import { CheckButton } from "@/components/CheckButton";
 import { clsx } from "@/lib/clsx";
 
-function monthWord(label: string | null | undefined, kind: PollKind) {
-  if (kind === "place") return "모임 장소 투표";
-  const m = label ? Number(label.split("-")[1]) : NaN;
-  return Number.isFinite(m) ? `${m}월 책 투표` : "다음 책 투표";
-}
+const pollTitle = (label: string | null | undefined, kind: PollKind) => (kind === "place" ? "모임 장소 투표" : label ? `${monthWord(label)} 책 투표` : "다음 책 투표");
 
 export default function PollPage({ params }: { params: Promise<{ kind: string }> }) {
   const { kind: k } = use(params);
@@ -30,7 +26,7 @@ export default function PollPage({ params }: { params: Promise<{ kind: string }>
     <div className="flex flex-col gap-4 max-w-[640px] mx-auto">
       <div className="flex items-center gap-3">
         <Link href="/" className="text-[17px] text-muted hover:text-ink" aria-label="홈으로">←</Link>
-        <Title>{monthWord(p?.roundLabel, kind)}</Title>
+        <Title>{pollTitle(p?.roundLabel, kind)}</Title>
       </div>
       {p?.status === "closed" ? (
         <ResultCard kind={kind} poll={p} />

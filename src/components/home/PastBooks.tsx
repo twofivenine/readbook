@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useLibrary } from "@/lib/hooks";
 import { Card, Cover, Title } from "@/components/ui";
+import { monthWord } from "@/lib/time";
 
 export function PastBooks() {
   const lib = useLibrary();
@@ -20,7 +21,7 @@ export function PastBooks() {
           {items.map((it) => (
             <Link key={it.roundId} href={`/library/${it.roundId}`} className="flex flex-col gap-1.5 min-w-0">
               <Cover url={it.book.coverUrl} title={it.book.title} className="w-full" />
-              <span className="label-mono tracking-normal! truncate">{it.label ? `${Number(it.label.split("-")[1])}월` : `${it.seq}회`} · {it.avgRating === null ? "–" : `★${it.avgRating}`}</span>
+              <span className="label-mono tracking-normal! truncate">{monthWord(it.label)} · {it.avgRating === null ? "–" : `★${it.avgRating}`}</span>
             </Link>
           ))}
         </div>
